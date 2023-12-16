@@ -3,8 +3,9 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 
 import { DiscordClientService } from './DiscordClientService';
-import { InvalidRoute } from '../routes/InvalidRoute';
+import { InvalidRoute } from '../Routes/InvalidRoute';
 import { RedisHandler } from '../Handler/RedisHandler';
+import { generateApiResponse, ResponseStatus } from '~/Utils/generateApiResponse';
 
 export class DiscordRestApi {
     private app: Application;
@@ -62,29 +63,45 @@ export class DiscordRestApi {
         const redisKey = `guild:${quildId}:user:${userId}:data`;
         const cachedUser = await this.redisClient.client.get(redisKey);
         if (cachedUser) {
-            res.json(cachedUser);
+            const response = await generateApiResponse(200, ResponseStatus.Success, cachedUser);
+            res.status(response.responseCode).json(response);
             return;
         }
 
         const member = await this.discordClientService.client.guilds.cache.get(quildId)?.members?.fetch(userId);
 
-        if ( !member ) {
-            res.json({ message: "Vituiks" });
+        if (!member) {
+            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid userId, or user doesnt find in guild");
+            res.status(response.responseCode).json(response);
             return;
         }
 
-        const { id: memberId, displayName, roles: memberRoles } = member;
+        const { id: memberId, displayName, roles: memberRoles, joinedAt, nickname } = member;
+
+        const userData = {
+            id: memberId,
+            name: displayName,
+            roles: memberRoles,
+            avatarURL: member.displayAvatarURL(),
+            joinedAt: joinedAt,
+            nickname: nickname,
+        };
+
+        await this.redisClient.client.setEx(redisKey, 60, JSON.stringify(userData));
+        const response = await generateApiResponse(200, ResponseStatus.Success, userData);
+        res.status(response.responseCode).json(response);
     }
 
 
     private async isUserUnderTwoWeeksOlds(req: Request, res: Response) { }
 
-    private authenticate(req: Request, res: Response, next: NextFunction) {
+    private async authenticate(req: Request, res: Response, next: NextFunction) {
         const apiKey = req.header('X-API-Key');
         if (apiKey === process.env.API_KEY) {
             next();
         } else {
-            res.status(401).json({ message: 'Unauthorized' });
+            const response = await generateApiResponse(401, ResponseStatus.Fail, "Unauthorized");
+            res.status(response.responseCode).json(response);
         }
     }
 
@@ -94,7 +111,8 @@ export class DiscordRestApi {
         const redisKey = `guild:${quildId}:memberCount`;
         const cachedCount = await this.redisClient.client.get(redisKey);
         if (cachedCount) {
-            res.json({ memberAmount: parseInt(cachedCount, 10) });
+            const response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: parseInt(cachedCount, 10) });
+            res.status(response.responseCode).json(response);
             return;
         }
 
@@ -103,15 +121,16 @@ export class DiscordRestApi {
 
         await this.redisClient.client.setEx(redisKey, 600, memberAmount.toString());
 
-        res.json({ memberAmount: memberAmount });
+        const response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: memberAmount });
+        res.status(response.responseCode).json(response);
     }
 
     private async getUsers(req: Request, res: Response) {
         const { quildId } = req.body;
-        
+
         const redisKey = `guild:${quildId}:users`;
         const cachedUsers = await this.redisClient.client.get(redisKey);
-        if ( cachedUsers ) {
+        if (cachedUsers) {
             res.json(cachedUsers);
             return;
         }
