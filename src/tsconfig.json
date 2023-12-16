@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./*"]
+    },
+    "noImplicitAny": true,
+    "module": "commonjs",
+    "target": "ES2020",
+    "allowJs": false,
+    "lib": ["es2015", "DOM"],
+    "types": ["@types/node"],
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "pretty": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "strictNullChecks": true
+  },
+  "include": [ "**/*" ],
+  "exclude": ["**/node_modules", "**/__tests__/*"]
+}
