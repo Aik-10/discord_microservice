@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "start": "node dist/index.js",
-    "build": "tsc -p src --outDir build",
-    "watch": "tsc --watch -p src"
+    "start": "tsc && node dist/index.js",
+    "build": "tsc -b",
+    "build:start": "node dist/index.js",
+    "ts:watch": "tsc --watch",
+    "watch": "nodemon -q dist/index.js"
   },
   "keywords": [],
   "author": "",

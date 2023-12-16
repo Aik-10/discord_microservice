@@ -1,4 +1,4 @@
-import { Client, Guild, GuildMember, GatewayIntentBits } from 'discord.js';
+import { Client, Guild, GuildMember, GatewayIntentBits, GuildBasedChannel } from 'discord.js';
 
 export class DiscordClientService {
     public client: Client;
@@ -25,6 +25,12 @@ export class DiscordClientService {
             await this.client.login(process.env.CLIENT_TOKEN);
         } catch (error: any) {
             console.error('Login failed, retrying in 10 seconds...');
+            
+            if (error?.code === "TokenInvalid" ) {
+                console.error('Login failed, Invalid bot token!');
+                return;
+            } 
+            
             console.error(error);
             setTimeout(() => this.login(), 10000);
         }
@@ -34,15 +40,31 @@ export class DiscordClientService {
         console.log(`Logged in as ${this.client.user?.tag}`);
     }
 
-    public getUsers(guild: Guild): { username: string; id: string }[] {
-        return guild?.members.cache.map((member) => ({
-            username: member.user.username,
+    public async getUsers(guild: Guild): Promise<userData[]> {
+        const members = await guild.members.fetch();
+        
+        return members?.map((member) => ({
             id: member.id,
+            username: member.user.username,
+            tag: member.user.tag,
+            avatarURL: member.displayAvatarURL(),
+            joinedAt: member.joinedAt,
         })) || [];
     }
 
-    public moveUser(member: GuildMember, channelId: string): Promise<GuildMember> {
-        return member.voice.setChannel(channelId);
+    public async getUsersInChannel(channel: GuildBasedChannel): Promise<userData[]> {
+        if (!channel?.isVoiceBased()) {
+            throw new Error("Cannot fetch member count in textbased channel!")
+        }
+        const members = channel.members;
+
+        return members?.map((member) => ({
+            id: member.id,
+            username: member.user.username,
+            tag: member.user.tag,
+            avatarURL: member.displayAvatarURL(),
+            joinedAt: member.joinedAt,
+        })) || [];
     }
 
     public moveUser(member: GuildMember, channelId: string): Promise<GuildMember> {

@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import { DiscordClientService } from './DiscordClientService';
 import { InvalidRoute } from '../Routes/InvalidRoute';
 import { RedisHandler } from '../Handler/RedisHandler';
-import { generateApiResponse, ResponseStatus } from '~/Utils/generateApiResponse';
+import { generateApiResponse, ResponseStatus } from '../Utils/generateApiResponse';
 
 export class DiscordRestApi {
     private app: Application;
@@ -15,7 +15,7 @@ export class DiscordRestApi {
     constructor() {
         this.app = express();
         this.discordClientService = new DiscordClientService();
-        this.redisClient = new RedisHandler();
+        // this.redisClient = new RedisHandler();
 
         this.setupMiddleware();
 
@@ -43,10 +43,12 @@ export class DiscordRestApi {
 
         this.app.get('/api/users', this.getUsers.bind(this));
         this.app.get('/api/user/:id', this.getUser.bind(this));
-
         this.app.get('/api/getUsersCount', this.getUsersCount.bind(this));
+        this.app.get('/api/channelUsers', this.channelUsers.bind(this));
 
         this.app.post('/api/moveUser', this.moveUser.bind(this));
+        
+
         this.app.post('/api/kickUserFromChannel', this.kickUserFromChannel.bind(this));
 
         // Add more routes for other actions (e.g., kicking users)
@@ -60,34 +62,41 @@ export class DiscordRestApi {
 
         if (!userId) throw new Error('Invalid id param!');
 
-        const redisKey = `guild:${quildId}:user:${userId}:data`;
+        /* const redisKey = `guild:${quildId}:user:${userId}:data`;
         const cachedUser = await this.redisClient.client.get(redisKey);
         if (cachedUser) {
             const response = await generateApiResponse(200, ResponseStatus.Success, cachedUser);
             res.status(response.responseCode).json(response);
             return;
+        } */
+
+        const guild = this.discordClientService.client.guilds.cache.get(quildId);
+        if (!guild) {
+            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid quildId param");
+            res.status(response.responseCode).json(response);
+            return;
         }
 
-        const member = await this.discordClientService.client.guilds.cache.get(quildId)?.members?.fetch(userId);
-
+        const member = await guild.members?.fetch(userId);
+        console.log(member)
         if (!member) {
             const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid userId, or user doesnt find in guild");
             res.status(response.responseCode).json(response);
             return;
         }
 
-        const { id: memberId, displayName, roles: memberRoles, joinedAt, nickname } = member;
+        const { id: memberId, displayName, roles: memberRoles, joinedAt } = member;
 
         const userData = {
             id: memberId,
             name: displayName,
-            roles: memberRoles,
+            roles: memberRoles.cache.map(({ id }) => id),
             avatarURL: member.displayAvatarURL(),
             joinedAt: joinedAt,
-            nickname: nickname,
         };
 
-        await this.redisClient.client.setEx(redisKey, 60, JSON.stringify(userData));
+        // await this.redisClient.client.setEx(redisKey, 60, JSON.stringify(userData));
+
         const response = await generateApiResponse(200, ResponseStatus.Success, userData);
         res.status(response.responseCode).json(response);
     }
@@ -100,7 +109,7 @@ export class DiscordRestApi {
         if (apiKey === process.env.API_KEY) {
             next();
         } else {
-            const response = await generateApiResponse(401, ResponseStatus.Fail, "Unauthorized");
+            const response = await generateApiResponse(401, ResponseStatus.Error, "Unauthorized");
             res.status(response.responseCode).json(response);
         }
     }
@@ -108,18 +117,18 @@ export class DiscordRestApi {
     private async getUsersCount(req: Request, res: Response): Promise<void> {
         const { quildId } = req.body;
 
-        const redisKey = `guild:${quildId}:memberCount`;
+        /* const redisKey = `guild:${quildId}:memberCount`;
         const cachedCount = await this.redisClient.client.get(redisKey);
         if (cachedCount) {
             const response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: parseInt(cachedCount, 10) });
             res.status(response.responseCode).json(response);
             return;
         }
-
-        const guild = await this.discordClientService.client.guilds.fetch(quildId);
+ */     
+        const guild = await this.discordClientService.client.guilds.cache.get(quildId);
         const memberAmount = guild?.memberCount || 0;
 
-        await this.redisClient.client.setEx(redisKey, 600, memberAmount.toString());
+        // await this.redisClient.client.setEx(redisKey, 600, memberAmount.toString());
 
         const response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: memberAmount });
         res.status(response.responseCode).json(response);
@@ -128,23 +137,35 @@ export class DiscordRestApi {
     private async getUsers(req: Request, res: Response) {
         const { quildId } = req.body;
 
-        const redisKey = `guild:${quildId}:users`;
+        if (!quildId ) {
+            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid quildId param");
+            res.status(response.responseCode).json(response);
+            return;
+        }
+
+        /* const redisKey = `guild:${quildId}:users`;
         const cachedUsers = await this.redisClient.client.get(redisKey);
         if (cachedUsers) {
             res.json(cachedUsers);
             return;
+        } */
+
+        const guild = this.discordClientService.client.guilds.cache.get(quildId);
+        if (!guild ) {
+            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid quildId param");
+            res.status(response.responseCode).json(response);
+            return;
         }
 
-        const guild = await this.discordClientService.client.guilds.fetch(quildId);
-        const users = this.discordClientService.getUsers(guild);
+        const users = await this.discordClientService.getUsers(guild);
 
-        await this.redisClient.client.setEx(redisKey, 600, JSON.stringify(users));
-
-        res.json(users);
+        // await this.redisClient.client.setEx(redisKey, 600, JSON.stringify(users));
+        const response = await generateApiResponse(200, ResponseStatus.Success, users)
+        res.status(response.responseCode).json(response);
     }
 
     private moveUser(req: Request, res: Response) {
-        const { userId, channelId } = req.body;
+        const { userId, channelId, quildId } = req.body;
         const guild = this.discordClientService.client.guilds.cache.first();
         const member = guild?.members.cache.get(userId);
 
@@ -155,6 +176,25 @@ export class DiscordRestApi {
         } else {
             res.status(404).json({ message: 'User not found' });
         }
+    }
+    
+    private async channelUsers(req: Request, res: Response) {
+        const { channelId, quildId } = req.body;
+
+        const guild = await this.discordClientService.client.guilds.cache.get(quildId);        
+        const channel = guild?.channels.cache.get(channelId);
+
+        if (!guild || !channel) {
+            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid quildId param");
+            res.status(response.responseCode).json(response);
+            return;
+        }
+
+        const users = await this.discordClientService.getUsersInChannel(channel);
+
+
+        const response = await generateApiResponse(200, ResponseStatus.Success, users);
+        res.status(response.responseCode).json(response);       
     }
 
     private kickUserFromChannel(req: Request, res: Response) {
