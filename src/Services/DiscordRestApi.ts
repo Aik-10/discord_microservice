@@ -12,16 +12,19 @@ import { UsersIdError } from '../Errors/UsersIdError';
 import { UsersError } from '../Errors/UsersError';
 import { ChannelError } from '../Errors/ChannelError';
 import { ChannelIsTextBasedError } from '../Errors/ChannelIsTextBasedError';
+import { RedisHandler } from '../Handler/RedisHandler';
 
 export class DiscordRestApi {
     private app: Application;
     private discordClientService: DiscordClientService;
+    protected redisClient: RedisHandler;
+
     private readonly defaultResponse: DefaultResponse;
 
     constructor() {
         this.app = express();
         this.discordClientService = new DiscordClientService();
-        // this.redisClient = new RedisHandler();
+        this.redisClient = new RedisHandler();
 
         this.defaultResponse = generateApiResponse(400, ResponseStatus.Fail, "Invalid to get response!");
 
@@ -81,7 +84,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, "User disconnected!");
         } catch (error: GuildError | UsersIdError | UsersError | any) {
-            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
         }
@@ -96,6 +99,13 @@ export class DiscordRestApi {
 
             if (!quildId) throw new GuildError();
             if (!userId) throw new UsersIdError();
+
+            const redisKey = `guild:${quildId}:user:${userId}:data`;
+            const cachedUser = await this.redisClient.client.get(redisKey);
+            if (cachedUser) {
+                response = await generateApiResponse(200, ResponseStatus.Success, JSON.parse(cachedUser));
+                return;
+            }
 
             const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
             const member = await guild?.members.fetch(userId) || (() => { throw new UsersError(); })();
@@ -116,10 +126,11 @@ export class DiscordRestApi {
                 }
             };
 
+            await this.redisClient.client.setEx(redisKey, 60, JSON.stringify(userData));
+
             response = await generateApiResponse(200, ResponseStatus.Success, userData);
         } catch (error: GuildError | UsersIdError | UsersError | any) {
-            console.log(error)
-            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
         }
@@ -132,12 +143,20 @@ export class DiscordRestApi {
             const { quildId } = req.body;
 
             if (!quildId) throw new GuildError();
-
+            const redisKey = `guild:${quildId}:memberCount`;
+            const cachedMemberCount = await this.redisClient.client.get(redisKey);
+            if (cachedMemberCount) {
+                response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: cachedMemberCount });
+                return;
+            }
             const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
             const memberAmount = guild?.memberCount || 0;
+
+            await this.redisClient.client.setEx(redisKey, 600, memberAmount.toString());
+
             response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: memberAmount });
         } catch (error: GuildError | UsersIdError | UsersError | any) {
-            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
         }
@@ -151,12 +170,22 @@ export class DiscordRestApi {
 
             if (!quildId) throw new GuildError();
 
+            const redisKey = `guild:${quildId}:users`;
+            const cachedUsers = await this.redisClient.client.get(redisKey);
+            if (cachedUsers) {
+                response = await generateApiResponse(200, ResponseStatus.Success, JSON.parse(cachedUsers));
+                return;
+            }
+
             const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
             const users = await this.discordClientService.getUsers(guild);
 
+            await this.redisClient.client.setEx(redisKey, 600, JSON.stringify(users));
+
             response = await generateApiResponse(200, ResponseStatus.Success, users);
         } catch (error: GuildError | any) {
-            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+            console.error(error)
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
         }
@@ -182,12 +211,13 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, { message: 'User moved successfully' });
         } catch (error: GuildError | ChannelError | UsersIdError | UsersError | any) {
-            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
         }
     }
 
+    /* Redis cache not use here, because we wanna realtime data. */
     private async channelUsers(req: Request, res: Response): Promise<void> {
         let response = this.defaultResponse;
 
@@ -203,7 +233,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, users);
         } catch (error: GuildError | ChannelIsTextBasedError | ChannelError | any) {
-            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
         }

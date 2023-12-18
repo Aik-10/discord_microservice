@@ -1,7 +1,7 @@
-import Redis, { createClient, RedisClientType } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 
 export class RedisHandler {
-    public readonly client: RedisClientType;
+    public client: RedisClientType;
     
     constructor() {
         this.client = createClient({
@@ -11,5 +11,13 @@ export class RedisHandler {
                 port: Number(process.env.REDIS_PORT) ?? 6379
             }
         });
+
+        this.client.on('error', this.log);
+
+        this.client.connect();
+    }
+
+    private log(err: any) {
+        console.log('Redis Client Error', err)
     }
 }
