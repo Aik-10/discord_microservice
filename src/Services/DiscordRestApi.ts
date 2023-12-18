@@ -74,8 +74,8 @@ export class DiscordRestApi {
             if (!quildId) throw new GuildError();
             if (!userId) throw new UsersIdError();
 
-            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
-            const member = guild.members.cache.get(userId) || (() => { throw new UsersError(); })();
+            const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
+            const member = await guild.members.fetch(userId) || (() => { throw new UsersError(); })();
 
             await this.discordClientService.kickUserInVoice(member);
 
@@ -98,7 +98,7 @@ export class DiscordRestApi {
             if (!userId) throw new UsersIdError();
 
             const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
-            const member = guild.members.cache.get(userId) || (() => { throw new UsersError(); })();
+            const member = await guild?.members.fetch(userId) || (() => { throw new UsersError(); })();
 
             const { id: memberId, displayName, roles: memberRoles, joinedAt, voice } = member;
 
@@ -109,7 +109,7 @@ export class DiscordRestApi {
                 avatarURL: member.displayAvatarURL(),
                 joinedAt: joinedAt,
                 createdAt: member.user.createdAt,
-                isUserUnderTwoWeeksOldAccount: member.user.createdAt > new Date(new Date().getTime() - 14 * 24 * 60 * 60 * 1000),
+                isUserUnderTwoWeeksOld: member.user.createdAt > new Date(new Date().getTime() - 14 * 24 * 60 * 60 * 1000),
                 currentChannel: {
                     id: voice?.channel?.id,
                     name: voice?.channel?.name,
@@ -118,6 +118,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, userData);
         } catch (error: GuildError | UsersIdError | UsersError | any) {
+            console.log(error)
             response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
@@ -132,7 +133,7 @@ export class DiscordRestApi {
 
             if (!quildId) throw new GuildError();
 
-            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
+            const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
             const memberAmount = guild?.memberCount || 0;
             response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: memberAmount });
         } catch (error: GuildError | UsersIdError | UsersError | any) {
@@ -150,7 +151,7 @@ export class DiscordRestApi {
 
             if (!quildId) throw new GuildError();
 
-            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
+            const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
             const users = await this.discordClientService.getUsers(guild);
 
             response = await generateApiResponse(200, ResponseStatus.Success, users);
@@ -172,9 +173,10 @@ export class DiscordRestApi {
             if (!channelId) throw new ChannelError();
             if (!userId) throw new UsersIdError();
 
-            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
-            const channel = guild?.channels.cache.get(channelId) || (() => { throw new ChannelError(); })();
-            const member = guild.members.cache.get(userId) || (() => { throw new UsersError(); })();
+            const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
+            const member = await guild.members.fetch(userId) || (() => { throw new UsersError(); })();
+
+            await guild.channels.fetch(channelId) || (() => { throw new ChannelError(); })();
 
             await this.discordClientService.moveUser(member, channelId);
 
@@ -195,9 +197,8 @@ export class DiscordRestApi {
             if (!quildId) throw new GuildError();
             if (!channelId) throw new ChannelError();
 
-            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
-            const channel = guild?.channels.cache.get(channelId) || (() => { throw new ChannelError(); })();
-
+            const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
+            const channel = await guild?.channels.fetch(channelId) || (() => { throw new ChannelError(); })();
             const users = await this.discordClientService.getUsersInChannel(channel);
 
             response = await generateApiResponse(200, ResponseStatus.Success, users);
