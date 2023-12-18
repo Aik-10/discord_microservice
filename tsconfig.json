@@ -17,7 +17,7 @@
     "sourceMap": false,
     "baseUrl": "./src",
     "outDir": "dist",
-    "types": ["@types/node"],
+    "types": ["@types/node", "discord.js"],
     "paths": {
       "services/*": ["./src/Services/*"],
       "handler/*": ["./src/Handler/*"],

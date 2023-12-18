@@ -1,27 +1,35 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express, { Application, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import morgan from 'morgan';
 
 import { DiscordClientService } from './DiscordClientService';
 import { InvalidRoute } from '../Routes/InvalidRoute';
-import { RedisHandler } from '../Handler/RedisHandler';
-import { generateApiResponse, ResponseStatus } from '../Utils/generateApiResponse';
+import { generateApiResponse, ResponseStatus, Response as DefaultResponse } from '../Middlewares/Response';
+import { Authenticate } from '../Middlewares/Auth';
+import { GuildError } from '../Errors/GuildError';
+import { UsersIdError } from '../Errors/UsersIdError';
+import { UsersError } from '../Errors/UsersError';
+import { ChannelError } from '../Errors/ChannelError';
+import { ChannelIsTextBasedError } from '../Errors/ChannelIsTextBasedError';
 
 export class DiscordRestApi {
     private app: Application;
     private discordClientService: DiscordClientService;
-    private redisClient: RedisHandler;
+    private readonly defaultResponse: DefaultResponse;
 
     constructor() {
         this.app = express();
         this.discordClientService = new DiscordClientService();
         // this.redisClient = new RedisHandler();
 
+        this.defaultResponse = generateApiResponse(400, ResponseStatus.Fail, "Invalid to get response!");
+
         this.setupMiddleware();
 
         this.setupExpressRoutes();
 
-        this.app.listen(process.env.PORT ?? 3000, () => console.log('Server is running on port 3000'));
+        this.app.listen(process.env.PORT ?? 3000, () => console.log(`Server is running on port ${process.env.PORT ?? 3000}`));
     }
 
     private setupMiddleware() {
@@ -34,174 +42,169 @@ export class DiscordRestApi {
             max: 100, // Limit each IP to 100 requests per windowMs
         });
         this.app.use(limiter);
+        this.app.use(morgan('dev'));
 
         // Authentication middleware
-        this.app.use(this.authenticate.bind(this));
+        this.app.use(Authenticate);
     }
 
     private setupExpressRoutes() {
-
+        /* GET */
         this.app.get('/api/users', this.getUsers.bind(this));
+
         this.app.get('/api/user/:id', this.getUser.bind(this));
+
         this.app.get('/api/getUsersCount', this.getUsersCount.bind(this));
         this.app.get('/api/channelUsers', this.channelUsers.bind(this));
 
-        this.app.post('/api/moveUser', this.moveUser.bind(this));
-        
-
-        this.app.post('/api/kickUserFromChannel', this.kickUserFromChannel.bind(this));
-
-        // Add more routes for other actions (e.g., kicking users)
+        /* POST */
+        this.app.post('/api/kickUserInVoice/:id', this.kickUserInVoice.bind(this));
+        this.app.post('/api/moveUser/:id', this.moveUser.bind(this));
 
         this.app.use('*', InvalidRoute);
     }
 
-    private async getUser(req: Request, res: Response) {
-        const { quildId } = req.body;
-        const userId = req.params.id;
+    private async kickUserInVoice(req: Request, res: Response): Promise<void> {
+        let response = this.defaultResponse;
 
-        if (!userId) throw new Error('Invalid id param!');
+        try {
+            const { quildId } = req.body;
+            const userId = req.params.id;
 
-        /* const redisKey = `guild:${quildId}:user:${userId}:data`;
-        const cachedUser = await this.redisClient.client.get(redisKey);
-        if (cachedUser) {
-            const response = await generateApiResponse(200, ResponseStatus.Success, cachedUser);
+            if (!quildId) throw new GuildError();
+            if (!userId) throw new UsersIdError();
+
+            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
+            const member = guild.members.cache.get(userId) || (() => { throw new UsersError(); })();
+
+            await this.discordClientService.kickUserInVoice(member);
+
+            response = await generateApiResponse(200, ResponseStatus.Success, "User disconnected!");
+        } catch (error: GuildError | UsersIdError | UsersError | any) {
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+        } finally {
             res.status(response.responseCode).json(response);
-            return;
-        } */
-
-        const guild = this.discordClientService.client.guilds.cache.get(quildId);
-        if (!guild) {
-            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid quildId param");
-            res.status(response.responseCode).json(response);
-            return;
         }
-
-        const member = await guild.members?.fetch(userId);
-        console.log(member)
-        if (!member) {
-            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid userId, or user doesnt find in guild");
-            res.status(response.responseCode).json(response);
-            return;
-        }
-
-        const { id: memberId, displayName, roles: memberRoles, joinedAt } = member;
-
-        const userData = {
-            id: memberId,
-            name: displayName,
-            roles: memberRoles.cache.map(({ id }) => id),
-            avatarURL: member.displayAvatarURL(),
-            joinedAt: joinedAt,
-        };
-
-        // await this.redisClient.client.setEx(redisKey, 60, JSON.stringify(userData));
-
-        const response = await generateApiResponse(200, ResponseStatus.Success, userData);
-        res.status(response.responseCode).json(response);
     }
 
+    private async getUser(req: Request, res: Response) {
+        let response = this.defaultResponse;
 
-    private async isUserUnderTwoWeeksOlds(req: Request, res: Response) { }
+        try {
+            const { quildId } = req.body;
+            const userId = req.params.id;
 
-    private async authenticate(req: Request, res: Response, next: NextFunction) {
-        const apiKey = req.header('X-API-Key');
-        if (apiKey === process.env.API_KEY) {
-            next();
-        } else {
-            const response = await generateApiResponse(401, ResponseStatus.Error, "Unauthorized");
+            if (!quildId) throw new GuildError();
+            if (!userId) throw new UsersIdError();
+
+            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
+            const member = guild.members.cache.get(userId) || (() => { throw new UsersError(); })();
+
+            const { id: memberId, displayName, roles: memberRoles, joinedAt, voice } = member;
+
+            const userData = {
+                id: memberId,
+                name: displayName,
+                roles: memberRoles.cache.map(({ id }) => id),
+                avatarURL: member.displayAvatarURL(),
+                joinedAt: joinedAt,
+                createdAt: member.user.createdAt,
+                isUserUnderTwoWeeksOldAccount: member.user.createdAt > new Date(new Date().getTime() - 14 * 24 * 60 * 60 * 1000),
+                currentChannel: {
+                    id: voice?.channel?.id,
+                    name: voice?.channel?.name,
+                }
+            };
+
+            response = await generateApiResponse(200, ResponseStatus.Success, userData);
+        } catch (error: GuildError | UsersIdError | UsersError | any) {
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+        } finally {
             res.status(response.responseCode).json(response);
         }
     }
 
     private async getUsersCount(req: Request, res: Response): Promise<void> {
-        const { quildId } = req.body;
+        let response = this.defaultResponse;
 
-        /* const redisKey = `guild:${quildId}:memberCount`;
-        const cachedCount = await this.redisClient.client.get(redisKey);
-        if (cachedCount) {
-            const response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: parseInt(cachedCount, 10) });
+        try {
+            const { quildId } = req.body;
+
+            if (!quildId) throw new GuildError();
+
+            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
+            const memberAmount = guild?.memberCount || 0;
+            response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: memberAmount });
+        } catch (error: GuildError | UsersIdError | UsersError | any) {
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+        } finally {
             res.status(response.responseCode).json(response);
-            return;
         }
- */     
-        const guild = await this.discordClientService.client.guilds.cache.get(quildId);
-        const memberAmount = guild?.memberCount || 0;
-
-        // await this.redisClient.client.setEx(redisKey, 600, memberAmount.toString());
-
-        const response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: memberAmount });
-        res.status(response.responseCode).json(response);
     }
 
-    private async getUsers(req: Request, res: Response) {
-        const { quildId } = req.body;
+    private async getUsers(req: Request, res: Response): Promise<void> {
+        let response = this.defaultResponse;
 
-        if (!quildId ) {
-            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid quildId param");
+        try {
+            const { quildId } = req.body;
+
+            if (!quildId) throw new GuildError();
+
+            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
+            const users = await this.discordClientService.getUsers(guild);
+
+            response = await generateApiResponse(200, ResponseStatus.Success, users);
+        } catch (error: GuildError | any) {
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+        } finally {
             res.status(response.responseCode).json(response);
-            return;
         }
+    }
 
-        /* const redisKey = `guild:${quildId}:users`;
-        const cachedUsers = await this.redisClient.client.get(redisKey);
-        if (cachedUsers) {
-            res.json(cachedUsers);
-            return;
-        } */
+    private async moveUser(req: Request, res: Response): Promise<void> {
+        let response = this.defaultResponse;
 
-        const guild = this.discordClientService.client.guilds.cache.get(quildId);
-        if (!guild ) {
-            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid quildId param");
+        try {
+            const { channelId, quildId } = req.body;
+            const userId = req.params.id;
+
+            if (!quildId) throw new GuildError();
+            if (!channelId) throw new ChannelError();
+            if (!userId) throw new UsersIdError();
+
+            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
+            const channel = guild?.channels.cache.get(channelId) || (() => { throw new ChannelError(); })();
+            const member = guild.members.cache.get(userId) || (() => { throw new UsersError(); })();
+
+            await this.discordClientService.moveUser(member, channelId);
+
+            response = await generateApiResponse(200, ResponseStatus.Success, { message: 'User moved successfully' });
+        } catch (error: GuildError | ChannelError | UsersIdError | UsersError | any) {
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+        } finally {
             res.status(response.responseCode).json(response);
-            return;
-        }
-
-        const users = await this.discordClientService.getUsers(guild);
-
-        // await this.redisClient.client.setEx(redisKey, 600, JSON.stringify(users));
-        const response = await generateApiResponse(200, ResponseStatus.Success, users)
-        res.status(response.responseCode).json(response);
-    }
-
-    private moveUser(req: Request, res: Response) {
-        const { userId, channelId, quildId } = req.body;
-        const guild = this.discordClientService.client.guilds.cache.first();
-        const member = guild?.members.cache.get(userId);
-
-        if (member) {
-            this.discordClientService.moveUser(member, channelId)
-                .then(() => res.json({ message: 'User moved successfully' }))
-                .catch((error) => res.status(500).json({ message: 'Error moving user', error }));
-        } else {
-            res.status(404).json({ message: 'User not found' });
         }
     }
-    
-    private async channelUsers(req: Request, res: Response) {
-        const { channelId, quildId } = req.body;
 
-        const guild = await this.discordClientService.client.guilds.cache.get(quildId);        
-        const channel = guild?.channels.cache.get(channelId);
+    private async channelUsers(req: Request, res: Response): Promise<void> {
+        let response = this.defaultResponse;
 
-        if (!guild || !channel) {
-            const response = await generateApiResponse(400, ResponseStatus.Error, "Invalid quildId param");
+        try {
+            const { channelId, quildId } = req.body;
+
+            if (!quildId) throw new GuildError();
+            if (!channelId) throw new ChannelError();
+
+            const guild = this.discordClientService.client.guilds.cache.get(quildId) || (() => { throw new GuildError(); })();
+            const channel = guild?.channels.cache.get(channelId) || (() => { throw new ChannelError(); })();
+
+            const users = await this.discordClientService.getUsersInChannel(channel);
+
+            response = await generateApiResponse(200, ResponseStatus.Success, users);
+        } catch (error: GuildError | ChannelIsTextBasedError | ChannelError | any) {
+            response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? "Internal server error" : error?.message);
+        } finally {
             res.status(response.responseCode).json(response);
-            return;
         }
-
-        const users = await this.discordClientService.getUsersInChannel(channel);
-
-
-        const response = await generateApiResponse(200, ResponseStatus.Success, users);
-        res.status(response.responseCode).json(response);       
     }
-
-    private kickUserFromChannel(req: Request, res: Response) {
-        const { userId } = req.body;
-        const guild = this.discordClientService.client.guilds.cache.first();
-
-        res.status(404).json({ message: 'User not found' });
-    }
-
 }

@@ -4,7 +4,7 @@ export enum ResponseStatus {
     Error = 'error',
 }
 
-type Response<T = unknown> = {
+export type Response<T = unknown> = {
     responseCode: number;
 } & ({
     status: ResponseStatus.Error;

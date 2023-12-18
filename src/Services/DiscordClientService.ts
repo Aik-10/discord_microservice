@@ -1,4 +1,5 @@
-import { Client, Guild, GuildMember, GatewayIntentBits, GuildBasedChannel } from 'discord.js';
+import { ChannelIsTextBasedError } from '../Errors/ChannelIsTextBasedError';
+import { Client, Guild, GuildMember, GatewayIntentBits, GuildBasedChannel, Collection, VoiceBasedChannel } from 'discord.js';
 
 export class DiscordClientService {
     public client: Client;
@@ -25,12 +26,12 @@ export class DiscordClientService {
             await this.client.login(process.env.CLIENT_TOKEN);
         } catch (error: any) {
             console.error('Login failed, retrying in 10 seconds...');
-            
-            if (error?.code === "TokenInvalid" ) {
+
+            if (error?.code === "TokenInvalid") {
                 console.error('Login failed, Invalid bot token!');
                 return;
-            } 
-            
+            }
+
             console.error(error);
             setTimeout(() => this.login(), 10000);
         }
@@ -42,35 +43,43 @@ export class DiscordClientService {
 
     public async getUsers(guild: Guild): Promise<userData[]> {
         const members = await guild.members.fetch();
-        
-        return members?.map((member) => ({
-            id: member.id,
-            username: member.user.username,
-            tag: member.user.tag,
-            avatarURL: member.displayAvatarURL(),
-            joinedAt: member.joinedAt,
-        })) || [];
+        return await this.getMemberData(members);
     }
 
     public async getUsersInChannel(channel: GuildBasedChannel): Promise<userData[]> {
         if (!channel?.isVoiceBased()) {
-            throw new Error("Cannot fetch member count in textbased channel!")
+            throw new ChannelIsTextBasedError();
         }
-        const members = channel.members;
 
-        return members?.map((member) => ({
+        return await this.getMemberData(channel?.members);
+    }
+
+    public async moveUser(member: GuildMember, channelId: string): Promise<GuildMember> {
+        return await member.voice.setChannel(channelId);
+    }
+
+    public async kickUserInVoice(member: GuildMember): Promise<void> {
+        await member.voice.disconnect();
+    }
+
+    private async getMemberData(members: Collection<string, GuildMember>): Promise<userData[]> {
+        return await members?.map((member) => ({
             id: member.id,
             username: member.user.username,
             tag: member.user.tag,
             avatarURL: member.displayAvatarURL(),
             joinedAt: member.joinedAt,
+            currentChannel: this.getMemberChannelData(member?.voice.channel)
         })) || [];
     }
 
-    public moveUser(member: GuildMember, channelId: string): Promise<GuildMember> {
-        return member.voice.setChannel(channelId);
+    private getMemberChannelData(channel: VoiceBasedChannel | null): channelData | null {
+        if (!channel) return null;
+
+        return {
+            id: channel.id,
+            name: channel.name
+        }
     }
 
-
-    // Add more methods for other actions (e.g., kicking users)
 }
