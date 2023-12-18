@@ -1,5 +1,5 @@
 import { ChannelIsTextBasedError } from '../Errors/ChannelIsTextBasedError';
-import { Client, Guild, GuildMember, GatewayIntentBits, GuildBasedChannel, Collection, VoiceBasedChannel } from 'discord.js';
+import { Client, Guild, GuildMember, GatewayIntentBits, GuildBasedChannel, Collection, VoiceBasedChannel, MessagePayload, MessageCreateOptions } from 'discord.js';
 
 export class DiscordClientService {
     public client: Client;
@@ -44,6 +44,10 @@ export class DiscordClientService {
     public async getUsers(guild: Guild): Promise<userData[]> {
         const members = await guild.members.fetch();
         return await this.getMemberData(members);
+    }
+
+    public async sendUserPrivateMessage(member: GuildMember, options: string | MessagePayload | MessageCreateOptions): Promise<void> {
+        await member?.send(options);
     }
 
     public async getUsersInChannel(channel: GuildBasedChannel): Promise<userData[]> {
