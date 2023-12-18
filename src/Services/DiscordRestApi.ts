@@ -13,6 +13,7 @@ import { UsersError } from '../Errors/UsersError';
 import { ChannelError } from '../Errors/ChannelError';
 import { ChannelIsTextBasedError } from '../Errors/ChannelIsTextBasedError';
 import { RedisHandler } from '../Handler/RedisHandler';
+import { RabbitMQtest } from '../Utils/RabbitMQtest';
 
 export class DiscordRestApi {
     private app: Application;
@@ -20,6 +21,8 @@ export class DiscordRestApi {
     protected redisClient: RedisHandler;
 
     private readonly defaultResponse: DefaultResponse;
+
+    private rabbitMqTest: RabbitMQtest;
 
     constructor() {
         this.app = express();
@@ -29,6 +32,10 @@ export class DiscordRestApi {
         this.defaultResponse = generateApiResponse(400, ResponseStatus.Fail, "Invalid to get response!");
 
         this.setupMiddleware();
+
+
+        this.rabbitMqTest = new RabbitMQtest();
+
 
         this.setupExpressRoutes();
 
@@ -54,6 +61,7 @@ export class DiscordRestApi {
     private setupExpressRoutes() {
         /* GET */
         this.app.get('/api/users', this.getUsers.bind(this));
+        this.app.get('/api/testMessage/:id', this.testMessage.bind(this));
 
         this.app.get('/api/user/:id', this.getUser.bind(this));
 
@@ -65,6 +73,12 @@ export class DiscordRestApi {
         this.app.post('/api/moveUser/:id', this.moveUser.bind(this));
 
         this.app.use('*', InvalidRoute);
+    }
+
+    private testMessage(req: Request, res: Response) {
+        const userId = req.params.id;
+        this.rabbitMqTest.publishMessageToQueue(userId ?? "447428651160436747", "CONTENT MESSAGE HERE");
+        res.status(200).json({status: "OK"});
     }
 
     private async kickUserInVoice(req: Request, res: Response): Promise<void> {
