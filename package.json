@@ -20,7 +20,7 @@
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
-    "redis": "^4.6.11",
+    "redis": "^4.6.12",
     "request": "^2.88.2"
   },
   "devDependencies": {
