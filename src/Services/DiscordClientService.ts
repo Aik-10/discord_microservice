@@ -38,7 +38,7 @@ export class DiscordClientService {
     }
 
     private onReady(): void {
-        console.log(`Logged in as ${this.client.user?.tag}`);
+        console.log(`Client logged in as ${this.client.user?.tag}`);
     }
 
     public async getUsers(guild: Guild): Promise<userData[]> {

@@ -2,7 +2,7 @@ import express, { Application, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import morgan from 'morgan';
-
+import { isDev } from '../Utils/isDev';
 import { DiscordClientService } from './DiscordClientService';
 import { InvalidRoute } from '../Routes/InvalidRoute';
 import { generateApiResponse, ResponseStatus, Response as DefaultResponse } from '../Middlewares/Response';
@@ -14,32 +14,37 @@ import { ChannelError } from '../Errors/ChannelError';
 import { ChannelIsTextBasedError } from '../Errors/ChannelIsTextBasedError';
 import { RedisHandler } from '../Handler/RedisHandler';
 import { RabbitMQtest } from '../Utils/RabbitMQtest';
+import { getLogger } from '../Utils/Logger/lokiInitializer';
+
 
 export class DiscordRestApi {
+    
     private app: Application;
     private discordClientService: DiscordClientService;
     protected redisClient: RedisHandler;
+    protected logger;
 
     private readonly defaultResponse: DefaultResponse;
-
     private rabbitMqTest: RabbitMQtest;
 
     constructor() {
         this.app = express();
         this.discordClientService = new DiscordClientService();
         this.redisClient = new RedisHandler();
-
+        this.logger = getLogger();
         this.defaultResponse = generateApiResponse(400, ResponseStatus.Fail, "Invalid to get response!");
 
         this.setupMiddleware();
 
-
         this.rabbitMqTest = new RabbitMQtest();
 
-
         this.setupExpressRoutes();
+        const port = process.env.PORT ?? 3000;
+        this.app.listen(port, () => this.logger.info(`Server is running on port ${port}`));
 
-        this.app.listen(process.env.PORT ?? 3000, () => console.log(`Server is running on port ${process.env.PORT ?? 3000}`));
+        (async() => {
+            await this.redisClient.client.connect();
+        })();
     }
 
     private setupMiddleware() {
@@ -49,11 +54,12 @@ export class DiscordRestApi {
         // Rate limiting middleware
         const limiter = rateLimit({
             windowMs: 15 * 60 * 1000, // 15 minutes
-            max: 100, // Limit each IP to 100 requests per windowMs
+            max: parseInt(`${process.env.API_RATELIMIT_MAX}`) ?? 100, // Limit each IP to 100 requests per windowMs
         });
-        this.app.use(limiter);
-        this.app.use(morgan('dev'));
 
+        this.app.use(limiter);
+        this.app.use(morgan('[:date[web]] :method :url :status :res[content-length] - :response-time ms ":user-agent"'));
+        
         // Authentication middleware
         this.app.use(Authenticate);
     }
@@ -77,6 +83,12 @@ export class DiscordRestApi {
 
     private testMessage(req: Request, res: Response) {
         const userId = req.params.id;
+        const { adminRequest } = req.body;
+        if ( !adminRequest ) {
+            res.status(400).json({ status: "Failed" });
+            return;
+        };
+
         this.rabbitMqTest.publishMessageToQueue(userId ?? "447428651160436747", "CONTENT MESSAGE HERE");
         res.status(200).json({status: "OK"});
     }
@@ -98,6 +110,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, "User disconnected!");
         } catch (error: GuildError | UsersIdError | UsersError | any) {
+            this.logger.error(error);
             response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
@@ -144,6 +157,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, userData);
         } catch (error: GuildError | UsersIdError | UsersError | any) {
+            this.logger.error(error);
             response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
@@ -170,6 +184,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, { memberAmount: memberAmount });
         } catch (error: GuildError | UsersIdError | UsersError | any) {
+            this.logger.error(error);
             response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
@@ -198,7 +213,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, users);
         } catch (error: GuildError | any) {
-            console.error(error)
+            this.logger.error(error);
             response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
@@ -225,6 +240,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, { message: 'User moved successfully' });
         } catch (error: GuildError | ChannelError | UsersIdError | UsersError | any) {
+            this.logger.error(error);
             response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);
@@ -247,6 +263,7 @@ export class DiscordRestApi {
 
             response = await generateApiResponse(200, ResponseStatus.Success, users);
         } catch (error: GuildError | ChannelIsTextBasedError | ChannelError | any) {
+            this.logger.error(error);
             response = await generateApiResponse(400, ResponseStatus.Error, error instanceof Error ? error.message : error?.message);
         } finally {
             res.status(response.responseCode).json(response);

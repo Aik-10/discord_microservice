@@ -1,3 +1,4 @@
+import { getLogger } from '../Utils/Logger/lokiInitializer';
 import { DiscordClientService } from '../Services/DiscordClientService';
 import amqp, { Channel, ConsumeMessage } from 'amqplib';
 
@@ -5,9 +6,12 @@ export class RabbitMQHandler {
     private channel: Channel;
     private discordService: DiscordClientService;
 
+    protected logger;
+
     constructor() {
         this.setupRabbitMQ();
         this.discordService = new DiscordClientService();
+        this.logger = getLogger();
     }
 
     private async setupRabbitMQ() {
@@ -23,10 +27,14 @@ export class RabbitMQHandler {
     }
 
     private async handlePrivateMessage(msg: ConsumeMessage | null): Promise<void> {
-        if (!msg) return;
+        if (!msg) {
+            this.logger.warning("RabbitMq message received, but msg is empty!");
+            return;
+        }
 
         const { userId, content } = JSON.parse(msg.content.toString());
-
+        
+        this.logger.warning(`RabbitMq message received, userId: ${userId}`);
         const user = await this.discordService.client.users.fetch(userId);
         if (user) {
             user.send(content);

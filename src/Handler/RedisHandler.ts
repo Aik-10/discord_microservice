@@ -4,17 +4,17 @@ export class RedisHandler {
     public client: RedisClientType;
 
     constructor() {
-        this.client = createClient({
+        this.client = createClient(
+        {
             password: process.env.REDIS_PASSWORD,
             socket: {
-                host: process.env.REDIS_ADDRESS,
-                port: Number(process.env.REDIS_PORT) ?? 6379
+                host: process.env.REDIS_HOST,
+                port: parseInt(process.env.REDIS_PORT || '6379', 10)
             }
-        });
+        }
+        );
 
         this.client.on('error', this.log);
-
-        this.client.connect();
     }
 
     private log(err: any) {
