@@ -1,6 +1,13 @@
 FROM node:20-slim AS base
+
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+
+ENV PORT=3000
+ENV API_KEY=$uuid
+
+ENV QUEUE_NAME="private_messages"
+
 RUN corepack enable
 COPY . /app
 WORKDIR /app
