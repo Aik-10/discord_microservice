@@ -12,4 +12,4 @@ To run the tests, run `pnpm test`.
 
 ## Production
 
-You can build the project by running `pnpm run build`, which will generate the projects files to the `dist` folder. To preview the production build, run `pnpm run build:start`.
+You can build the project by running `pnpm run build`, which will generate the projects files to the `dist` folder. To preview the production build, run `pnpm run start`.
