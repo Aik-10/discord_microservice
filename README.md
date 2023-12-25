@@ -134,7 +134,7 @@ All requests to the API must include the `X-API-Key` header. This header is requ
 
 </details>
 
-#### Kick the user out of the voice channel
+#### Move user to another voice channel
 
 <details>
  <summary><code>POST</code> <code><b>/moveUser/:id</b></code></summary>
