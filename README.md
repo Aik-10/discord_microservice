@@ -1,15 +1,21 @@
-# Discord microservice (Typescript)
+<a href="https://your-project-url.com/"><img src="https://i.imgur.com/1MrKKwu.png" align="right" /></a>
 
-This repository contains the code for the discord microservice.
+# Peliporukka RP Discord Microservice (Typescript)
+
+Welcome to the Peliporukka RP Discord Microservice repository. This microservice is an integral part of the Peliporukka RP backend system.
 
 ## Development
 
-First, install the necessary packages with `pnpm install`
+To get started, install the required packages with `pnpm install`.
 
-To start the development server, run `pnpm run watch`. It will automatically refresh the page when you make changes to the code.
+Initiate the development server by running `pnpm run ts:watch && pnpm run watch`. It automatically refreshes the page upon code changes.
 
-To run the tests, run `pnpm test`.
+## Services
+- Express.js
+- Discord.js 14v
+- [Redis Cache](https://redis.io/) 
+- [RabbitMQ](https://www.rabbitmq.com/) Message Queue
 
 ## Production
 
-You can build the project by running `pnpm run build`, which will generate the projects files to the `dist` folder. To preview the production build, run `pnpm run start`.
+Build the project using `pnpm run build`, generating files in the `dist` folder. Preview the production build with `pnpm run start`.
