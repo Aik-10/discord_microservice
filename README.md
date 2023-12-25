@@ -1,4 +1,4 @@
-<a href="https://your-project-url.com/"><img src="https://i.imgur.com/1MrKKwu.png" align="right" /></a>
+<a href="https://pprp.fi/"><img src="https://i.imgur.com/1MrKKwu.png" align="right" /></a>
 
 # Peliporukka RP Discord Microservice (Typescript)
 

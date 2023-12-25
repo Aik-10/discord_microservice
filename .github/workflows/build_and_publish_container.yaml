@@ -3,6 +3,7 @@ name: Build and publish container
 on:
   push:
     branches: [main]
+    paths: ["src/**", "package.json", "pnpm-lock.yaml", "Dockerfile", ".github/workflows/**"]
   workflow_dispatch:
 
 env:
