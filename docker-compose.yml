@@ -1,0 +1,41 @@
+version: "3.2"
+services:
+  microservice:
+    env_file: .env
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    image: microservice
+    container_name: microservice
+    restart: always
+    ports:
+      - 3000:3000
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - microservice_net
+    environment:
+      QUEUE_CONNECT: 'amqp://rabbitmq'
+      REDIS_HOST: 'redis'
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+    networks:
+      - microservice_net
+
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: redis-stack-server
+    ports:
+      - 6379:6379
+    networks:
+      - microservice_net
+
+networks:
+  microservice_net:
+    driver: bridge
