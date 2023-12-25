@@ -54,7 +54,7 @@ All requests to the API must include the `X-API-Key` header. This header is requ
 #### Get Guild user data
 
 <details>
- <summary><code>GET</code> <code><b>/users/:id</b></code></summary>
+ <summary><code>GET</code> <code><b>/user/:id</b></code></summary>
 
 ##### Parameters
 
