@@ -12,7 +12,6 @@ import { UsersError } from '../Errors/UsersError';
 import { ChannelError } from '../Errors/ChannelError';
 import { ChannelIsTextBasedError } from '../Errors/ChannelIsTextBasedError';
 import { RedisHandler } from '../Handler/RedisHandler';
-import { RabbitMQtest } from '../Utils/RabbitMQtest';
 import { getLogger } from '../Utils/Logger/lokiInitializer';
 
 
@@ -24,7 +23,6 @@ export class DiscordRestApi {
     protected logger;
 
     private readonly defaultResponse: DefaultResponse;
-    private rabbitMqTest: RabbitMQtest;
 
     constructor() {
         this.app = express();
@@ -34,8 +32,6 @@ export class DiscordRestApi {
         this.defaultResponse = generateApiResponse(400, ResponseStatus.Fail, "Invalid to get response!");
 
         this.setupMiddleware();
-
-        this.rabbitMqTest = new RabbitMQtest();
 
         this.setupExpressRoutes();
         const port = process.env.PORT ?? 3000;
@@ -66,8 +62,6 @@ export class DiscordRestApi {
     private setupExpressRoutes() {
         /* GET */
         this.app.get('/api/users', this.getUsers.bind(this));
-        this.app.get('/api/testMessage/:id', this.testMessage.bind(this));
-
         this.app.get('/api/user/:id', this.getUser.bind(this));
 
         this.app.get('/api/getUsersCount', this.getUsersCount.bind(this));
@@ -78,18 +72,6 @@ export class DiscordRestApi {
         this.app.post('/api/moveUser/:id', this.moveUser.bind(this));
 
         this.app.use('*', InvalidRoute);
-    }
-
-    private testMessage(req: Request, res: Response) {
-        const userId = req.params.id;
-        const { adminRequest } = req.body;
-        if ( !adminRequest ) {
-            res.status(400).json({ status: "Failed" });
-            return;
-        };
-
-        this.rabbitMqTest.publishMessageToQueue(userId ?? "447428651160436747", "CONTENT MESSAGE HERE");
-        res.status(200).json({status: "OK"});
     }
 
     private async kickUserInVoice(req: Request, res: Response): Promise<void> {
