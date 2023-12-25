@@ -102,10 +102,9 @@ export class DiscordRestApi {
             if (!quildId) throw new GuildError();
             if (!userId) throw new UsersIdError();
 
-            /* TODO: Handle this if member is not in channel */
-
             const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
             const member = await guild.members.fetch(userId) || (() => { throw new UsersError(); })();
+            if (!member.voice?.channelId) throw new UsersError();
 
             await this.discordClientService.kickUserInVoice(member);
 
