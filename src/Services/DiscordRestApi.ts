@@ -2,11 +2,10 @@ import express, { Application, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { isDev } from '../Utils/isDev';
 import { DiscordClientService } from './DiscordClientService';
 import { InvalidRoute } from '../Routes/InvalidRoute';
-import { generateApiResponse, ResponseStatus, Response as DefaultResponse } from '../Middlewares/Response';
-import { Authenticate } from '../Middlewares/Auth';
+import { generateApiResponse, ResponseStatus, Response as DefaultResponse } from '../Routes/Middlewares/Response';
+import { Authenticate } from '../Routes/Middlewares/Auth';
 import { GuildError } from '../Errors/GuildError';
 import { UsersIdError } from '../Errors/UsersIdError';
 import { UsersError } from '../Errors/UsersError';
@@ -102,6 +101,8 @@ export class DiscordRestApi {
 
             if (!quildId) throw new GuildError();
             if (!userId) throw new UsersIdError();
+
+            /* TODO: Handle this if member is not in channel */
 
             const guild = await this.discordClientService.client.guilds.fetch(quildId) || (() => { throw new GuildError(); })();
             const member = await guild.members.fetch(userId) || (() => { throw new UsersError(); })();
