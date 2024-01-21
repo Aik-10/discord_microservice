@@ -17,6 +17,9 @@ Initiate the development server by running `pnpm run ts:watch && pnpm run watch`
 - [Redis Cache](https://redis.io/)
 - [RabbitMQ](https://www.rabbitmq.com/) Message Queue
 
+## Usage
+- Wiki page [github.io/discord_microservice/usage](https://aik-10.github.io/discord_microservice/usage)
+
 ## Production
 
 Build the project using `pnpm run build`, generating files in the `dist` folder. Preview the production build with `pnpm run start`.
