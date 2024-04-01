@@ -41,8 +41,8 @@ dependencies:
 
 devDependencies:
   '@types/amqplib':
-    specifier: ^0.10.4
-    version: 0.10.4
+    specifier: ^0.10.5
+    version: 0.10.5
   '@types/express':
     specifier: ^4.17.21
     version: 4.17.21
@@ -1023,8 +1023,8 @@ packages:
       '@sinonjs/commons': 3.0.0
     dev: true
 
-  /@types/amqplib@0.10.4:
-    resolution: {integrity: sha512-Y5Sqquh/LqDxSgxYaAAFNM0M7GyONtSDCcFMJk+DQwYEjibPyW6y+Yu9H9omdkKc3epyXULmFN3GTaeBHhn2Hg==}
+  /@types/amqplib@0.10.5:
+    resolution: {integrity: sha512-/cSykxROY7BWwDoi4Y4/jLAuZTshZxd8Ey1QYa/VaXriMotBDoou7V/twJiOSHzU6t1Kp1AHAUXGCgqq+6DNeg==}
     dependencies:
       '@types/node': 20.11.30
     dev: true
