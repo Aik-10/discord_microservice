@@ -36,8 +36,8 @@ dependencies:
     specifier: ^3.11.0
     version: 3.11.0
   winston-loki:
-    specifier: ^6.0.8
-    version: 6.0.8
+    specifier: ^6.1.1
+    version: 6.1.1
 
 devDependencies:
   '@types/amqplib':
@@ -3986,8 +3986,8 @@ packages:
       isexe: 2.0.0
     dev: true
 
-  /winston-loki@6.0.8:
-    resolution: {integrity: sha512-TwPxpMApBiDFBjwCFpOWurTpQOGXk3VVCwziANgmQdPAUXwH9ObYp7AcSJXCpa9zOtEi9w4MX6zPx+xAmQY5Mw==}
+  /winston-loki@6.1.1:
+    resolution: {integrity: sha512-o7428iDDyCJLixQL8hRf0dJMk92Ga8T69CmmvsmnFBYn3k5Jk5qpeUQUfQ7QlMczUFxOf4Xz/50Z9Urv5SO7NA==}
     dependencies:
       async-exit-hook: 2.0.1
       btoa: 1.2.1
