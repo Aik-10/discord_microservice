@@ -29,7 +29,7 @@
     "redis": "^4.6.12",
     "request": "^2.88.2",
     "winston": "^3.11.0",
-    "winston-loki": "^6.0.8"
+    "winston-loki": "^6.1.2"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.5",
