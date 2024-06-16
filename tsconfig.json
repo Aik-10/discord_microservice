@@ -14,17 +14,25 @@
     "noUncheckedIndexedAccess": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "sourceMap": false,
+    "sourceMap": true,
     "baseUrl": "./src",
     "outDir": "dist",
     "types": ["@types/node", "discord.js"],
+
     "paths": {
       "services/*": ["./src/Services/*"],
       "handler/*": ["./src/Handler/*"],
       "routes/*": ["./src/Routes/*"],
       "utils/*": ["./src/Utils/*"],
       "~/*": ["./src/*"]
-    }
+    },
+
+    "inlineSources": true,
+
+    // Set `sourceRoot` to  "/" to strip the build path prefix
+    // from generated source code references.
+    // This improves issue grouping in Sentry.
+    "sourceRoot": "/"
   },
   "include": ["src", "jest.config.ts", "Tests"],
   "exclude": ["node_modules", "**/__tests__/*"]

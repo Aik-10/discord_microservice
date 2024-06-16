@@ -2,6 +2,7 @@ import express, { Application, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import '../Utils/Sentry'
 import { DiscordClientService } from './DiscordClientService';
 import { InvalidRoute } from '../Routes/InvalidRoute';
 import { generateApiResponse, ResponseStatus, Response as DefaultResponse } from '../Routes/Middlewares/Response';
@@ -14,9 +15,10 @@ import { ChannelIsTextBasedError } from '../Errors/ChannelIsTextBasedError';
 import { RedisHandler } from '../Handler/RedisHandler';
 import { getLogger } from '../Utils/Logger/lokiInitializer';
 
+import * as Sentry from '@sentry/node';
 
 export class DiscordRestApi {
-    
+
     private app: Application;
     private discordClientService: DiscordClientService;
     protected redisClient: RedisHandler;
@@ -35,7 +37,10 @@ export class DiscordRestApi {
 
         this.setupExpressRoutes();
         const port = process.env.PORT ?? 3000;
-        this.app.listen(port, () => this.logger.info(`Server is running on port ${port}`));
+        this.app.listen(port, () => { 
+            this.logger.info(`Server is running on port ${port}`);
+            Sentry.setupExpressErrorHandler(this.app)
+         });
 
         (async() => {
             await this.redisClient.client.connect();
@@ -43,6 +48,7 @@ export class DiscordRestApi {
     }
 
     private setupMiddleware() {
+
         this.app.use(express.json());
         this.app.use(helmet()); // Adds security headers
 
@@ -54,7 +60,7 @@ export class DiscordRestApi {
 
         this.app.use(limiter);
         this.app.use(morgan('[:date[web]] :method :url :status :res[content-length] - :response-time ms ":user-agent"'));
-        
+
         // Authentication middleware
         this.app.use(Authenticate);
     }
